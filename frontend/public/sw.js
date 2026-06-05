@@ -1,4 +1,4 @@
-const CACHE = 'pokernoche-v1';
+const CACHE = 'pokernoche-v3';
 const PRECACHE = ['/', '/index.html'];
 
 self.addEventListener('install', e => {
