@@ -14,7 +14,7 @@ export default function Navbar() {
     `text-sm transition-colors ${isActive ? 'text-emerald-400 font-semibold' : 'text-gray-300 hover:text-white'}`
 
   return (
-    <nav className="bg-gray-900 border-b border-gray-700 px-6 py-3 flex items-center justify-between" style={{paddingTop: 'max(12px, env(safe-area-inset-top))'}}>
+    <nav className="bg-gray-900 border-b border-gray-700 px-6 py-3 flex items-center justify-between">
       <div className="flex items-center gap-6">
         <NavLink to="/" className="text-emerald-400 font-bold text-xl tracking-tight">
           Poker Nights
