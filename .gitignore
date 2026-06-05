@@ -1,0 +1,28 @@
+# --- env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- python ---
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# --- node ---
+node_modules/
+dist/
+build/
+*.log
+
+# --- claude (config personal: NUNCA commitear) ---
+.claude/settings.local.json
+CLAUDE.local.md
+.claude/logs/
+.mcp.json
+.claude-flow/
+.claude/
+
+# --- os ---
+.DS_Store
+Thumbs.db
