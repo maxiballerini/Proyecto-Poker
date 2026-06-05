@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+/* Evita franjas blancas en mobile (status bar + nav bar) */
+html, body, #root {
+  background-color: #111827;
+  min-height: 100dvh;
+}
+
+/* Safe area insets para notch / home indicator */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
 input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button {
   -webkit-appearance: none;
