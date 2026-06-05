@@ -39,15 +39,18 @@ def register(body: RegisterRequest):
     if not user:
         raise HTTPException(status_code=400, detail="No se pudo crear el usuario")
 
-    # Upsert profile — the DB trigger may already have run, so we upsert defensively
+    # Upsert profile — the DB trigger may already have run, so we upsert defensively.
+    # Try with email column first (requires migration 004); fall back without it.
+    profile_base = {'user_id': user.id, 'nombre': body.nombre}
     try:
-        service.table('profile').upsert({
-            'user_id': user.id,
-            'nombre': body.nombre,
-            'email': body.email.lower().strip(),
-        }).execute()
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error al crear perfil: {exc}")
+        service.table('profile').upsert(
+            {**profile_base, 'email': body.email.lower().strip()}
+        ).execute()
+    except Exception:
+        try:
+            service.table('profile').upsert(profile_base).execute()
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Error al crear perfil: {exc}")
 
     profile_resp = (
         service.table('profile')
