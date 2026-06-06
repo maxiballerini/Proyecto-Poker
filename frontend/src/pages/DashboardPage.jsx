@@ -158,7 +158,7 @@ export default function DashboardPage() {
               )
             })}
           </div>
-        )}
+        ) : null}
 
         {memberGrupos.length > 0 && (
           <div className="mt-10">
