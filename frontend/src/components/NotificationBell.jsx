@@ -4,6 +4,7 @@ import { api } from '../lib/api'
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState([])
   const [open, setOpen] = useState(false)
+  const [dropPos, setDropPos] = useState({ top: 0, right: 8 })
   const ref = useRef(null)
 
   const fetchNotifications = async () => {
@@ -44,7 +45,13 @@ export default function NotificationBell() {
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open && ref.current) {
+            const rect = ref.current.getBoundingClientRect()
+            setDropPos({ top: rect.bottom + 4, right: Math.max(8, window.innerWidth - rect.right) })
+          }
+          setOpen((o) => !o)
+        }}
         className="relative p-2 text-gray-400 hover:text-white transition-colors"
         title="Notificaciones"
       >
@@ -57,7 +64,10 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1 w-80 bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+        <div
+          className="fixed w-80 max-w-[calc(100vw-16px)] bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden"
+          style={{ top: dropPos.top, right: dropPos.right }}
+        >
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
             <span className="text-white font-semibold text-sm">Notificaciones</span>
             {unread > 0 && (

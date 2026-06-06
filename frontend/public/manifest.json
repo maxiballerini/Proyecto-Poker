@@ -1,6 +1,6 @@
 {
-  "name": "PokerNoche",
-  "short_name": "PokerNoche",
+  "name": "Poker Nights",
+  "short_name": "Poker Nights",
   "description": "Gestor de partidas de poker en casa",
   "start_url": "/",
   "scope": "/",

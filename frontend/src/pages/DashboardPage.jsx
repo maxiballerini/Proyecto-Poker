@@ -1,36 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { api } from '../lib/api'
-import { useAuth } from '../contexts/AuthContext'
 import NotificationBell from '../components/NotificationBell'
-
-function MyIdCard({ userId }) {
-  const [copied, setCopied] = useState(false)
-  const copy = () => {
-    navigator.clipboard.writeText(userId)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-  return (
-    <div className="mt-10 bg-gray-800 rounded-xl p-5 shadow-lg">
-      <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Mi ID de jugador</h2>
-      <p className="text-gray-500 text-xs mb-3">
-        Compartí este código con el host para que pueda vincular tu cuenta a un invitado que creó para vos.
-      </p>
-      <div className="flex items-center gap-3">
-        <code className="flex-1 text-xs font-mono text-emerald-300 bg-gray-900 rounded-lg px-3 py-2 overflow-x-auto whitespace-nowrap">
-          {userId}
-        </code>
-        <button
-          onClick={copy}
-          className="shrink-0 text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors"
-        >
-          {copied ? '✓ Copiado' : 'Copiar'}
-        </button>
-      </div>
-    </div>
-  )
-}
 
 function NewGrupoModal({ onClose, onCreated }) {
   const [nombre, setNombre] = useState('')
@@ -84,8 +55,8 @@ function NewGrupoModal({ onClose, onCreated }) {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [grupos, setGrupos] = useState([])
   const [memberGrupos, setMemberGrupos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -94,10 +65,12 @@ export default function DashboardPage() {
   const [error, setError] = useState(null)
 
   const fetchGrupos = async () => {
+    setLoading(true)
+    setError(null)
     try {
       const [data, memberData] = await Promise.all([
         api.get('/grupos'),
-        api.get('/grupos/member').catch(() => []),
+        api.get('/grupos/member'),
       ])
       setGrupos(data)
       setMemberGrupos(memberData)
@@ -108,7 +81,7 @@ export default function DashboardPage() {
     }
   }
 
-  useEffect(() => { fetchGrupos() }, [])
+  useEffect(() => { fetchGrupos() }, [location.key])
 
   const handleDelete = async (e, grupoId) => {
     e.stopPropagation()
@@ -141,19 +114,19 @@ export default function DashboardPage() {
               onClick={() => setShowNew(true)}
               className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
             >
-              + Nuevo grupo
+              Crear grupo
             </button>
           </div>
         </div>
 
         {loading ? (
           <p className="text-gray-400">Cargando…</p>
-        ) : grupos.length === 0 ? (
+        ) : grupos.length === 0 && memberGrupos.length === 0 ? (
           <div className="bg-gray-800 rounded-xl p-10 text-center">
             <p className="text-gray-400 mb-2">No tenés grupos todavía.</p>
-            <p className="text-gray-500 text-sm">Creá uno para empezar a registrar sesiones cash con tus amigos.</p>
+            <p className="text-gray-500 text-sm">Creá uno o pedile a alguien que te invite.</p>
           </div>
-        ) : (
+        ) : grupos.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {grupos.map((g) => {
               const confirming = deletingId === g.id
@@ -186,8 +159,6 @@ export default function DashboardPage() {
             })}
           </div>
         )}
-
-        <MyIdCard userId={user?.id ?? ''} />
 
         {memberGrupos.length > 0 && (
           <div className="mt-10">

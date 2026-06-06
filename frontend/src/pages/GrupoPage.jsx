@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import AmountDisplay from '../components/AmountDisplay'
@@ -39,16 +39,20 @@ function StatusBadge({ estado }) {
 }
 
 function LinkGuestModal({ guest, onClose, onLinked }) {
-  const [userId, setUserId] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  const isEmail = (v) => v.includes('@')
 
   const submit = async (e) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
+    const val = identifier.trim()
+    const body = isEmail(val) ? { email: val } : { nickname: val }
     try {
-      const player = await api.post(`/guests/${guest.id}/link`, { user_id: userId.trim() })
+      const player = await api.post(`/guests/${guest.id}/link`, body)
       onLinked(guest.id, player)
     } catch (err) {
       setError(err.message)
@@ -62,16 +66,16 @@ function LinkGuestModal({ guest, onClose, onLinked }) {
       <div className="bg-gray-800 rounded-xl p-6 shadow-xl w-full max-w-md">
         <h2 className="text-lg font-bold text-white mb-1">Vincular cuenta a {guest.nombre}</h2>
         <p className="text-gray-400 text-sm mb-4">
-          Pegá el UUID del usuario registrado. El invitado puede verlo en el dashboard de su cuenta.
+          Ingresá el nickname (@nombre) o el email del usuario registrado.
         </p>
         <form onSubmit={submit} className="space-y-3">
           <input
             type="text"
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             required
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500"
+            placeholder="nickname o email"
+            className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
           />
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <div className="flex gap-3 pt-1">
@@ -109,7 +113,7 @@ function AddMemberForm({ grupoId, onAddMember, onError }) {
         setNombre(''); setAlias('')
       } else {
         const val = identifier.trim()
-        const body = isEmail(val) ? { email: val } : { player_id: val }
+        const body = isEmail(val) ? { email: val } : { nickname: val }
         member = await api.post(`/grupos/${grupoId}/members`, body)
         setIdentifier('')
       }
@@ -143,7 +147,7 @@ function AddMemberForm({ grupoId, onAddMember, onError }) {
           </>
         ) : (
           <input value={identifier} onChange={(e) => setIdentifier(e.target.value)} required
-            placeholder="Email o UUID del usuario"
+            placeholder="Nickname o email"
             className="flex-1 bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
         )}
         <button type="submit" disabled={loading}
@@ -210,16 +214,16 @@ function NewSesionModal({ grupoId, members, onClose, onCreated }) {
       <div className="bg-gray-800 rounded-xl p-6 shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold text-white mb-4">Nueva sesión cash</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
             <div>
               <label className="block text-gray-300 text-sm mb-1">Fecha</label>
               <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required
-                className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500" />
+                className="w-full h-10 bg-gray-700 border border-gray-600 text-white rounded-lg px-3 focus:outline-none focus:border-emerald-500" />
             </div>
             <div>
               <label className="block text-gray-300 text-sm mb-1">Nombre (opcional)</label>
               <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)}
-                className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-500"
+                className="w-full h-10 bg-gray-700 border border-gray-600 text-white rounded-lg px-3 focus:outline-none focus:border-emerald-500"
                 placeholder="ej. Viernes" />
             </div>
           </div>
@@ -273,6 +277,7 @@ function NewSesionModal({ grupoId, members, onClose, onCreated }) {
 export default function GrupoPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuth()
   const [detail, setDetail] = useState(null)
   const [ranking, setRanking] = useState([])
@@ -306,7 +311,7 @@ export default function GrupoPage() {
     }
   }
 
-  useEffect(() => { fetchDetail() }, [id])
+  useEffect(() => { fetchDetail() }, [id, location.key])
 
   const handleRemoveMember = async (playerId) => {
     const snap = detail.miembros
@@ -395,6 +400,9 @@ export default function GrupoPage() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold text-white">{grupo.nombre}</h1>
           <div className="flex items-center gap-2">
+            <button onClick={fetchDetail} className="text-gray-400 hover:text-white p-2 rounded-lg transition-colors" title="Actualizar">
+              ↻
+            </button>
             <NotificationBell />
             {isHost && (
               <button

@@ -100,9 +100,10 @@ def list_member_grupos(user=Depends(get_current_user)):
     for g in grupos_resp.data:
         members_resp = service.table('grupo_member').select('player_id').eq('grupo_id', g['id']).execute()
         partidas_resp = service.table('cash_session').select('id').eq('grupo_id', g['id']).execute()
+        host_in_members = any(m['player_id'] == g['host_id'] for m in members_resp.data)
         result.append(GrupoResponse(
             id=g['id'], host_id=g['host_id'], nombre=g['nombre'], created_at=g['created_at'],
-            total_miembros=len(members_resp.data),
+            total_miembros=len(members_resp.data) + (0 if host_in_members else 1),
             total_partidas=len(partidas_resp.data),
         ))
     return result
@@ -123,9 +124,10 @@ def list_grupos(user=Depends(get_current_user)):
     for g in grupos_resp.data:
         members_resp = service.table('grupo_member').select('player_id').eq('grupo_id', g['id']).execute()
         partidas_resp = service.table('cash_session').select('id').eq('grupo_id', g['id']).execute()
+        host_in_members = any(m['player_id'] == g['host_id'] for m in members_resp.data)
         result.append(GrupoResponse(
             id=g['id'], host_id=g['host_id'], nombre=g['nombre'], created_at=g['created_at'],
-            total_miembros=len(members_resp.data),
+            total_miembros=len(members_resp.data) + (0 if host_in_members else 1),
             total_partidas=len(partidas_resp.data),
         ))
     return result
@@ -160,7 +162,8 @@ def get_grupo(grupo_id: str, user=Depends(get_current_user)):
         .execute()
     )
 
-    members_count = len(player_ids)
+    host_in_members = any(pid == grupo_row['host_id'] for pid in player_ids)
+    members_count = len(player_ids) + (0 if host_in_members else 1)
     partidas_count = len(partidas_resp.data)
 
     grupo_info = GrupoResponse(
@@ -221,25 +224,36 @@ def list_members(grupo_id: str, user=Depends(get_current_user)):
 
 @router.post("/grupos/{grupo_id}/members", response_model=PlayerInfo, status_code=201)
 def add_registered_member(grupo_id: str, body: dict, user=Depends(get_current_user)):
-    """Add a registered user to the grupo by UUID or email. Host only."""
+    """Add a registered user to the grupo by nickname or email. Host only."""
     service = get_service_client()
     _require_grupo_host(grupo_id, user.id, service)
 
     player_id = body.get('player_id')
     email = body.get('email')
-    if not player_id and not email:
-        raise HTTPException(status_code=422, detail="player_id o email requerido")
+    nickname = body.get('nickname')
+    if not player_id and not email and not nickname:
+        raise HTTPException(status_code=422, detail="nickname o email requerido")
 
-    if email and not player_id:
-        profile_by_email = (
-            service.table('profile')
-            .select('user_id, nombre, alias_pago')
-            .eq('email', email.lower().strip())
-            .execute()
-        )
-        if not profile_by_email.data:
-            raise HTTPException(status_code=404, detail="No se encontró un usuario con ese email")
-        player_id = profile_by_email.data[0]['user_id']
+    if not player_id:
+        if email:
+            found = (
+                service.table('profile')
+                .select('user_id, nombre, alias_pago')
+                .eq('email', email.lower().strip())
+                .execute()
+            )
+            if not found.data:
+                raise HTTPException(status_code=404, detail="No se encontró un usuario con ese email")
+        else:
+            found = (
+                service.table('profile')
+                .select('user_id, nombre, alias_pago')
+                .eq('nickname', nickname.lower().strip())
+                .execute()
+            )
+            if not found.data:
+                raise HTTPException(status_code=404, detail="No se encontró un usuario con ese nickname")
+        player_id = found.data[0]['user_id']
 
     profile_resp = service.table('profile').select('user_id, nombre, alias_pago').eq('user_id', player_id).execute()
     if not profile_resp.data:
@@ -302,16 +316,19 @@ def link_guest_to_user(guest_id: str, body: GuestLinkRequest, user=Depends(get_c
     if not guest_resp.data:
         raise HTTPException(status_code=404, detail="Invitado no encontrado o sin permiso")
 
-    profile_resp = (
-        service.table('profile')
-        .select('user_id, nombre, alias_pago')
-        .eq('user_id', body.user_id)
-        .execute()
-    )
+    # Resolve user_id from nickname or email if not provided directly
+    if body.user_id:
+        profile_resp = service.table('profile').select('user_id, nombre, alias_pago').eq('user_id', body.user_id).execute()
+    elif body.email:
+        profile_resp = service.table('profile').select('user_id, nombre, alias_pago').eq('email', body.email.lower().strip()).execute()
+    elif body.nickname:
+        profile_resp = service.table('profile').select('user_id, nombre, alias_pago').eq('nickname', body.nickname.lower().strip()).execute()
+    else:
+        raise HTTPException(status_code=422, detail="nickname o email requerido")
     if not profile_resp.data:
         raise HTTPException(status_code=404, detail="Usuario registrado no encontrado")
 
-    new_id = body.user_id
+    new_id = profile_resp.data[0]['user_id']
     try:
         service.table('session_player').update({'player_id': new_id}).eq('player_id', guest_id).execute()
         service.table('buyin').update({'player_id': new_id}).eq('player_id', guest_id).execute()

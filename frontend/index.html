@@ -2,8 +2,8 @@
 <html lang="es" style="background:#111827">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>PokerNoche</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Poker Nights</title>
 
     <!-- PWA manifest -->
     <link rel="manifest" href="/manifest.json" />
@@ -15,7 +15,7 @@
     <!-- iOS "Add to Home Screen" support -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-    <meta name="apple-mobile-web-app-title" content="PokerNoche" />
+    <meta name="apple-mobile-web-app-title" content="Poker Nights" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
 
     <!-- Favicon -->
@@ -28,7 +28,20 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+          navigator.serviceWorker.register('/sw.js').then(reg => {
+            // Check for a new SW version every time the user returns to the app
+            document.addEventListener('visibilitychange', () => {
+              if (document.visibilityState === 'visible') reg.update();
+            });
+          }).catch(() => {});
+
+          // When a new SW takes control, reload once to serve fresh files
+          let reloading = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (reloading) return;
+            reloading = true;
+            window.location.reload();
+          });
         });
       }
     </script>

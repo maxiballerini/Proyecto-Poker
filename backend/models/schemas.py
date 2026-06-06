@@ -14,6 +14,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     nombre: str
+    nickname: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -27,11 +28,13 @@ class ProfileResponse(BaseModel):
     user_id: str
     nombre: str
     alias_pago: Optional[str] = None
+    nickname: Optional[str] = None
 
 
 class ProfileUpdate(BaseModel):
     nombre: Optional[str] = None
     alias_pago: Optional[str] = None
+    nickname: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +89,9 @@ class GuestPlayerCreate(BaseModel):
 
 
 class GuestLinkRequest(BaseModel):
-    user_id: str
+    user_id: Optional[str] = None
+    email: Optional[str] = None
+    nickname: Optional[str] = None
 
 
 class InviteInfo(BaseModel):

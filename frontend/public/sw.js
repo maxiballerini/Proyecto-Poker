@@ -1,4 +1,4 @@
-const CACHE = 'pokernoche-v3';
+const CACHE = 'poker-nights-v5';
 const PRECACHE = ['/', '/index.html'];
 
 self.addEventListener('install', e => {
@@ -17,18 +17,19 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  // Network-first for API calls; cache-first for static assets.
-  if (e.request.url.includes('/api/') || e.request.url.includes('supabase')) {
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-  } else {
-    e.respondWith(
-      caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      }))
-    );
-  }
+
+  const url = new URL(e.request.url);
+  // Cross-origin requests (backend API, Supabase) go straight to network — never cache.
+  if (url.origin !== self.location.origin) return;
+
+  // Same-origin static assets: cache-first, populate on miss.
+  e.respondWith(
+    caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+      if (res.ok) {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+      }
+      return res;
+    }))
+  );
 });

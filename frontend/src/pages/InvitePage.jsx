@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -12,6 +12,7 @@ export default function InvitePage() {
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState(null)
   const [notFound, setNotFound] = useState(false)
+  const autoJoined = useRef(false)
 
   useEffect(() => {
     api.get(`/invite/${token}`)
@@ -37,11 +38,18 @@ export default function InvitePage() {
         navigate(`/grupos/${info.grupo_id}`)
       } else {
         setError(err.message)
+        setJoining(false)
       }
-    } finally {
-      setJoining(false)
     }
   }
+
+  // Auto-join when user is logged in and invite info is loaded
+  useEffect(() => {
+    if (user && info && !autoJoined.current) {
+      autoJoined.current = true
+      handleJoin()
+    }
+  }, [user, info])
 
   if (authLoading || loadingInfo) {
     return (
@@ -82,29 +90,24 @@ export default function InvitePage() {
         {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
         {user ? (
-          <button
-            onClick={handleJoin}
-            disabled={joining}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white font-semibold py-3 rounded-xl transition-colors"
-          >
-            {joining ? 'Uniéndote…' : 'Unirme al grupo'}
-          </button>
+          <p className="text-gray-400 text-sm">{joining ? 'Uniéndote al grupo…' : 'Procesando…'}</p>
         ) : (
           <div className="space-y-3">
             <p className="text-gray-400 text-sm">Para unirte necesitás una cuenta.</p>
             <Link
-              to={`/register`}
+              to="/register"
+              state={{ redirect: `/invite/${token}` }}
               className="block w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl transition-colors"
             >
               Registrarme
             </Link>
             <Link
-              to={`/login`}
+              to="/login"
+              state={{ redirect: `/invite/${token}` }}
               className="block w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 rounded-xl transition-colors"
             >
               Iniciar sesión
             </Link>
-            <p className="text-gray-500 text-xs">Después del login, volvé a este link para unirte.</p>
           </div>
         )}
 

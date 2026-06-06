@@ -40,21 +40,24 @@ def register(body: RegisterRequest):
         raise HTTPException(status_code=400, detail="No se pudo crear el usuario")
 
     # Upsert profile — the DB trigger may already have run, so we upsert defensively.
-    # Try with email column first (requires migration 004); fall back without it.
-    profile_base = {'user_id': user.id, 'nombre': body.nombre}
+    profile_data: dict = {
+        'user_id': user.id,
+        'nombre': body.nombre,
+        'email': body.email.lower().strip(),
+    }
+    if body.nickname:
+        profile_data['nickname'] = body.nickname.lower().strip()
     try:
-        service.table('profile').upsert(
-            {**profile_base, 'email': body.email.lower().strip()}
-        ).execute()
+        service.table('profile').upsert(profile_data).execute()
     except Exception:
         try:
-            service.table('profile').upsert(profile_base).execute()
+            service.table('profile').upsert({'user_id': user.id, 'nombre': body.nombre}).execute()
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"Error al crear perfil: {exc}")
 
     profile_resp = (
         service.table('profile')
-        .select('user_id, nombre, alias_pago')
+        .select('user_id, nombre, alias_pago, nickname')
         .eq('user_id', user.id)
         .single()
         .execute()
@@ -102,7 +105,7 @@ def me(user=Depends(get_current_user)):
 
     profile_resp = (
         service.table('profile')
-        .select('user_id, nombre, alias_pago')
+        .select('user_id, nombre, alias_pago, nickname')
         .eq('user_id', user.id)
         .single()
         .execute()
@@ -131,7 +134,7 @@ def update_me(body: ProfileUpdate, user=Depends(get_current_user)):
 
     profile_resp = (
         service.table('profile')
-        .select('user_id, nombre, alias_pago')
+        .select('user_id, nombre, alias_pago, nickname')
         .eq('user_id', user.id)
         .single()
         .execute()

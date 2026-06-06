@@ -182,7 +182,7 @@ npx @claude-flow/cli@latest doctor --fix
 - No trailing summaries or recaps after completing a task
 ## Project
 
-PokerNoche — web app para gestionar partidas de poker en vivo (home games). Dos módulos: ledger de cash estilo Splitwise (buy-ins/cash-outs, cálculo de quién le debe a quién con mínimas transferencias, mostrando alias de pago) y manager de MTT (estructura de ciegas, reloj con alarma + modo TV, premios).
+Poker Nights — web app para gestionar partidas de poker en vivo (home games). Dos módulos: ledger de cash estilo Splitwise (buy-ins/cash-outs, cálculo de quién le debe a quién con mínimas transferencias, mostrando alias de pago) y manager de MTT (estructura de ciegas, reloj con alarma + modo TV, premios).
 
 - Stack: FastAPI (Python) + Supabase (Postgres, Auth, RLS, Realtime) + React/Vite + Tailwind
 - Roles: host (escritura) / jugador (lee sus datos + ve deudas y el alias del acreedor)
