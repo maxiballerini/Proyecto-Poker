@@ -27,21 +27,24 @@
     <script type="module" src="/src/main.jsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
+        let reloading = false;
+        const doReload = () => { if (!reloading) { reloading = true; window.location.reload(); } };
+
+        // New SW sends SW_UPDATED after claiming clients — works even with old page code
+        navigator.serviceWorker.addEventListener('message', e => {
+          if (e.data && e.data.type === 'SW_UPDATED') doReload();
+        });
+
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').then(reg => {
-            // Check for a new SW version every time the user returns to the app
+            // Also check for updates every time the user returns to the app
             document.addEventListener('visibilitychange', () => {
               if (document.visibilityState === 'visible') reg.update();
             });
           }).catch(() => {});
 
-          // When a new SW takes control, reload once to serve fresh files
-          let reloading = false;
-          navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (reloading) return;
-            reloading = true;
-            window.location.reload();
-          });
+          // Fallback: reload when a new SW takes control via controllerchange
+          navigator.serviceWorker.addEventListener('controllerchange', doReload);
         });
       }
     </script>
