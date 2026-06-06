@@ -37,7 +37,7 @@ export default function SettingsModal({ onClose }) {
         alias_pago: alias.trim() || undefined,
       })
       setSuccess(true)
-      setTimeout(() => setSuccess(false), 2000)
+      setTimeout(() => { setSuccess(false); onClose() }, 1200)
     } catch (err) {
       setError(err.message)
     } finally {
