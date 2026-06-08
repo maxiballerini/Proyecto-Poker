@@ -150,9 +150,12 @@ export default function TrackerSessionsPage() {
   }
 
   const handleSaved = (saved) => {
+    const list = Array.isArray(saved) ? saved : [saved]
     setSessions((prev) => {
-      const exists = prev.some((s) => s.id === saved.id)
-      return exists ? prev.map((s) => (s.id === saved.id ? saved : s)) : [saved, ...prev]
+      if (list.length === 1 && prev.some((s) => s.id === list[0].id)) {
+        return prev.map((s) => (s.id === list[0].id ? list[0] : s))
+      }
+      return [...list, ...prev]
     })
     setShowModal(false)
     setEditing(null)

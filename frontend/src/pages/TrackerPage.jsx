@@ -59,7 +59,8 @@ export default function TrackerPage() {
   useEffect(() => { load() }, [])
 
   const handleSaved = (saved) => {
-    setSessions((prev) => [saved, ...prev])
+    const list = Array.isArray(saved) ? saved : [saved]
+    setSessions((prev) => [...list, ...prev])
     setShowModal(false)
   }
 
