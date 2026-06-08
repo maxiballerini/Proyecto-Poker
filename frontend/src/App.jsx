@@ -5,6 +5,10 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import TournamentsListPage from './pages/TournamentsListPage'
+import TrackerPage from './pages/TrackerPage'
+import TrackerSessionsPage from './pages/TrackerSessionsPage'
+import TrackerBankrollPage from './pages/TrackerBankrollPage'
+import TrackerStatsPage from './pages/TrackerStatsPage'
 import GrupoPage from './pages/GrupoPage'
 import SessionPage from './pages/SessionPage'
 import TournamentPage from './pages/TournamentPage'
@@ -55,6 +59,50 @@ function AppRoutes() {
             <>
               <Navbar />
               <TournamentsListPage />
+            </>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tracker"
+        element={
+          <ProtectedRoute>
+            <>
+              <Navbar />
+              <TrackerPage />
+            </>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tracker/sessions"
+        element={
+          <ProtectedRoute>
+            <>
+              <Navbar />
+              <TrackerSessionsPage />
+            </>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tracker/bankroll"
+        element={
+          <ProtectedRoute>
+            <>
+              <Navbar />
+              <TrackerBankrollPage />
+            </>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tracker/stats"
+        element={
+          <ProtectedRoute>
+            <>
+              <Navbar />
+              <TrackerStatsPage />
             </>
           </ProtectedRoute>
         }

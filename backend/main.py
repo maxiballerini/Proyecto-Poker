@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from routers import auth, cash, grupos, mtt, notifications, settlements
+from routers import auth, cash, grupos, mtt, notifications, settlements, tracker
 
 app = FastAPI(title="Poker Nights API", version="1.0.0")
 
@@ -20,6 +20,7 @@ app.include_router(cash.router, prefix="/cash", tags=["cash"])
 app.include_router(mtt.router, prefix="/mtt", tags=["mtt"])
 app.include_router(settlements.router, prefix="/cash", tags=["settlements"])
 app.include_router(notifications.router, tags=["notifications"])
+app.include_router(tracker.router, prefix="/tracker", tags=["tracker"])
 
 
 @app.get("/health")

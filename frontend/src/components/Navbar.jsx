@@ -14,6 +14,14 @@ export default function Navbar() {
           <NavLink to="/" className="text-emerald-400 font-bold text-lg tracking-tight shrink-0">
             Poker Nights
           </NavLink>
+          <NavLink
+            to="/tracker"
+            className={({ isActive }) =>
+              `text-sm font-medium transition-colors ${isActive ? 'text-white' : 'text-gray-400 hover:text-white'}`
+            }
+          >
+            Mi tracker
+          </NavLink>
         </div>
 
         {user && (
