@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { api } from '../../lib/api'
 
 const inputCls = 'w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500'
@@ -28,6 +28,70 @@ function Field({ label, children }) {
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// PokerCraft .txt parser
+// ---------------------------------------------------------------------------
+
+function parsePokerCraftFile(text) {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+  if (!lines.length) return null
+
+  // Line 0: "Tournament #ID, Code: Name, Hold'em No Limit"
+  const nameMatch = lines[0].match(/Tournament #\d+,\s*[^:]*:\s*(.+?),\s*Hold'em No Limit/i)
+  const nombreTorneo = nameMatch ? nameMatch[1].trim() : ''
+
+  const isBounty = /bounty|mystery bounty|secret ko|progressive ko|\bpko\b|\bko\b/i.test(nombreTorneo)
+  const estructura = /hyper/i.test(nombreTorneo) ? 'hyper' : /turbo/i.test(nombreTorneo) ? 'turbo' : 'regular'
+
+  // "Buy-in: $11.5+$2+$11.5" → sum all parts as total cost per entry
+  const buyinLine = lines.find((l) => l.startsWith('Buy-in:')) || ''
+  const buyinParts = (buyinLine.match(/\$[\d.]+/g) || []).map((p) => parseFloat(p.slice(1)))
+  const totalBuyin = buyinParts.reduce((a, b) => a + b, 0)
+
+  // "18953 Players"
+  const playersMatch = lines.find((l) => /Players/.test(l))?.match(/^([\d,]+)\s+Players/)
+  const entrantes = playersMatch ? parseInt(playersMatch[1].replace(',', ''), 10) : null
+
+  // "Tournament started 2026/06/06 14:30:00"
+  const dateMatch = lines.find((l) => l.startsWith('Tournament started'))?.match(/(\d{4})\/(\d{2})\/(\d{2})/)
+  const fecha = dateMatch ? `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}` : null
+
+  // "You finished the tournament in 533th place."
+  const posMatch = lines.find((l) => l.startsWith('You finished'))?.match(/in (\d+)/)
+  const posicion = posMatch ? parseInt(posMatch[1], 10) : null
+
+  // "You made 1 re-entries and received..." or "You received..."
+  const receivedLine = lines.find((l) => l.includes('received a total'))
+  const reentryMatch = receivedLine?.match(/made (\d+) re-entr/)
+  const rebuys = reentryMatch ? parseInt(reentryMatch[1], 10) : 0
+
+  // Prize: "$0" or "$1,234.56" — chips-based tournaments have no $ amount
+  const prizeMatch = receivedLine?.match(/received a total of \$([0-9.,]+)/)
+  const premioPozo = prizeMatch ? Math.round(parseFloat(prizeMatch[1].replace(',', '')) * 100) : 0
+
+  return {
+    nombreTorneo,
+    buyinTorneo: totalBuyin > 0 ? String(totalBuyin) : '',
+    comision: '0',
+    rebuys,
+    addons: 0,
+    premioPozo: premioPozo > 0 ? String(premioPozo / 100) : '',
+    entrantes: entrantes ? String(entrantes) : '',
+    posicion: posicion ? String(posicion) : '',
+    estructura,
+    lateReg: false,
+    esBounty: isBounty,
+    tipoBounty: 'normal',
+    bountiesCobrados: 0,
+    gananciaBounty: '',
+    _fecha: fecha,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tournament block state helpers
+// ---------------------------------------------------------------------------
 
 function emptyTorneo(t = null) {
   return {
@@ -68,6 +132,10 @@ function buildTorneoPayload(t) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// TorneoBlock
+// ---------------------------------------------------------------------------
+
 function TorneoBlock({ torneo, onChange, onRemove, canRemove, index }) {
   const set = (field) => (e) =>
     onChange(index, field, e.target.type === 'checkbox' ? e.target.checked : e.target.value)
@@ -91,11 +159,11 @@ function TorneoBlock({ torneo, onChange, onRemove, canRemove, index }) {
       </Field>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Field label="Buy-in">
-          <input type="text" inputMode="decimal" value={torneo.buyinTorneo} onChange={set('buyinTorneo')} className={inputCls} placeholder="100" />
+        <Field label="Buy-in total">
+          <input type="text" inputMode="decimal" value={torneo.buyinTorneo} onChange={set('buyinTorneo')} className={inputCls} placeholder="25" />
         </Field>
         <Field label="Comisión">
-          <input type="text" inputMode="decimal" value={torneo.comision} onChange={set('comision')} className={inputCls} placeholder="9" />
+          <input type="text" inputMode="decimal" value={torneo.comision} onChange={set('comision')} className={inputCls} placeholder="0" />
         </Field>
         <Field label="Re-entries">
           <input type="number" min="0" value={torneo.rebuys} onChange={set('rebuys')} className={inputCls} />
@@ -144,13 +212,17 @@ function TorneoBlock({ torneo, onChange, onRemove, canRemove, index }) {
             <input type="text" inputMode="decimal" value={torneo.gananciaBounty} onChange={set('gananciaBounty')} className={inputCls} placeholder="35" />
           </Field>
           <p className="col-span-full text-xs text-amber-200/70">
-            Cargá por separado lo que ganaste por knockouts y lo que ganaste del pozo de premios — así las estadísticas de bounty quedan precisas.
+            Cargá por separado lo que ganaste por knockouts y lo que ganaste del pozo de premios.
           </p>
         </div>
       )}
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Main modal
+// ---------------------------------------------------------------------------
 
 export default function SessionFormModal({ onClose, onSaved, bankrolls, initial }) {
   const [tipo, setTipo] = useState(initial?.tipo ?? 'cash')
@@ -170,16 +242,48 @@ export default function SessionFormModal({ onClose, onSaved, bankrolls, initial 
   const [cashout, setCashout] = useState(fromCentavos(initial?.cashout_centavos))
   const [mesaSize, setMesaSize] = useState(initial?.mesa_size != null ? String(initial.mesa_size) : '')
 
-  // tournament list (always at least one)
+  // tournament list
   const [torneos, setTorneos] = useState([emptyTorneo(initial?.torneo)])
+  const [importError, setImportError] = useState(null)
 
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+
+  const fileInputRef = useRef(null)
 
   const updateTorneo = (index, field, value) =>
     setTorneos((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)))
   const addTorneo = () => setTorneos((prev) => [...prev, emptyTorneo()])
   const removeTorneo = (index) => setTorneos((prev) => prev.filter((_, i) => i !== index))
+
+  const handleImportFiles = (e) => {
+    const files = Array.from(e.target.files)
+    if (!files.length) return
+    setImportError(null)
+
+    Promise.all(
+      files.map((file) => new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = (ev) => resolve(parsePokerCraftFile(ev.target.result))
+        reader.readAsText(file)
+      }))
+    ).then((parsed) => {
+      const valid = parsed.filter(Boolean)
+      if (!valid.length) { setImportError('No se pudo leer ningún archivo.'); return }
+
+      if (valid[0]._fecha) setFecha(valid[0]._fecha)
+      setModalidad('online')
+      setTipo('torneo')
+
+      setTorneos((prev) => {
+        const onlyEmpty = prev.length === 1 && !prev[0].nombreTorneo && !prev[0].buyinTorneo
+        const newBlocks = valid.map(({ _fecha, ...t }) => ({ ...emptyTorneo(), ...t, _key: Date.now() + Math.random() }))
+        return onlyEmpty ? newBlocks : [...prev, ...newBlocks]
+      })
+
+      e.target.value = ''
+    })
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -242,6 +346,17 @@ export default function SessionFormModal({ onClose, onSaved, bankrolls, initial 
       <div className="bg-gray-800 rounded-xl p-6 shadow-xl w-full max-w-2xl my-auto">
         <h2 className="text-xl font-bold text-white mb-4">{initial ? 'Editar sesión' : 'Nueva sesión'}</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
+
+          {!initial && (
+            <>
+              <input ref={fileInputRef} type="file" multiple accept=".txt" className="hidden" onChange={handleImportFiles} />
+              <button type="button" onClick={() => fileInputRef.current?.click()}
+                className="w-full py-2.5 rounded-lg border border-dashed border-blue-600/60 text-blue-400 hover:border-blue-500 hover:text-blue-300 text-sm transition-colors flex items-center justify-center gap-2">
+                Importar resultados desde PokerCraft (.txt)
+              </button>
+              {importError && <p className="text-red-400 text-xs">{importError}</p>}
+            </>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Tipo">
