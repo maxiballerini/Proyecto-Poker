@@ -250,6 +250,7 @@ export default function SessionFormModal({ onClose, onSaved, bankrolls, initial 
   const [loading, setLoading] = useState(false)
 
   const fileInputRef = useRef(null)
+  const folderInputRef = useRef(null)
 
   const updateTorneo = (index, field, value) =>
     setTorneos((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)))
@@ -257,8 +258,8 @@ export default function SessionFormModal({ onClose, onSaved, bankrolls, initial 
   const removeTorneo = (index) => setTorneos((prev) => prev.filter((_, i) => i !== index))
 
   const handleImportFiles = (e) => {
-    const files = Array.from(e.target.files)
-    if (!files.length) return
+    const files = Array.from(e.target.files).filter((f) => f.name.endsWith('.txt'))
+    if (!files.length) { setImportError('No se encontraron archivos .txt.'); return }
     setImportError(null)
 
     Promise.all(
@@ -350,10 +351,17 @@ export default function SessionFormModal({ onClose, onSaved, bankrolls, initial 
           {!initial && (
             <>
               <input ref={fileInputRef} type="file" multiple accept=".txt" className="hidden" onChange={handleImportFiles} />
-              <button type="button" onClick={() => fileInputRef.current?.click()}
-                className="w-full py-2.5 rounded-lg border border-dashed border-blue-600/60 text-blue-400 hover:border-blue-500 hover:text-blue-300 text-sm transition-colors flex items-center justify-center gap-2">
-                Importar resultados desde PokerCraft (.txt)
-              </button>
+              <input ref={folderInputRef} type="file" webkitdirectory="" className="hidden" onChange={handleImportFiles} />
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => fileInputRef.current?.click()}
+                  className="py-2.5 rounded-lg border border-dashed border-blue-600/60 text-blue-400 hover:border-blue-500 hover:text-blue-300 text-sm transition-colors">
+                  Importar archivos .txt
+                </button>
+                <button type="button" onClick={() => folderInputRef.current?.click()}
+                  className="py-2.5 rounded-lg border border-dashed border-blue-600/60 text-blue-400 hover:border-blue-500 hover:text-blue-300 text-sm transition-colors">
+                  Importar carpeta
+                </button>
+              </div>
               {importError && <p className="text-red-400 text-xs">{importError}</p>}
             </>
           )}
