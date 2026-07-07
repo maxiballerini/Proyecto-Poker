@@ -10,7 +10,21 @@ const labelCls = 'block text-gray-300 text-xs mb-1'
 
 const toCentavos = (s) => {
   if (s === '' || s == null) return 0
-  const n = parseFloat(String(s).replace(',', '.'))
+  let str = String(s).trim().replace(/\s/g, '')
+  const lastComma = str.lastIndexOf(',')
+  const lastDot = str.lastIndexOf('.')
+  if (lastComma !== -1 && lastDot !== -1) {
+    // el separador que aparece último es el decimal
+    if (lastComma > lastDot) str = str.replace(/\./g, '').replace(',', '.')
+    else str = str.replace(/,/g, '')
+  } else if (lastComma !== -1) {
+    str = str.replace(',', '.')
+  } else if (lastDot !== -1) {
+    // punto con exactamente 3 dígitos detrás = separador de miles (10.000)
+    const parts = str.split('.')
+    if (parts.length > 2 || parts[parts.length - 1].length === 3) str = str.replace(/\./g, '')
+  }
+  const n = parseFloat(str)
   return isNaN(n) ? 0 : Math.round(n * 100)
 }
 
@@ -79,6 +93,64 @@ function NewBankrollModal({ onClose, onSaved }) {
             <button type="button" onClick={onClose} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg transition-colors">Cancelar</button>
             <button type="submit" disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white py-2 rounded-lg transition-colors">
               {loading ? 'Creando…' : 'Crear cuenta'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function EditBankrollModal({ bankroll, onClose, onSaved }) {
+  const [nombre, setNombre] = useState(bankroll.nombre)
+  const [moneda, setMoneda] = useState(bankroll.moneda)
+  const [saldoInicial, setSaldoInicial] = useState(String(bankroll.saldo_inicial_centavos / 100))
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      const saved = await api.put(`/tracker/bankrolls/${bankroll.id}`, {
+        nombre,
+        moneda,
+        saldo_inicial_centavos: toCentavos(saldoInicial),
+      })
+      onSaved(saved)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+      <div className="bg-gray-800 rounded-xl p-6 shadow-xl w-full max-w-sm">
+        <h2 className="text-lg font-bold text-white mb-4">Editar cuenta — {bankroll.nombre}</h2>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div>
+            <label className={labelCls}>Nombre</label>
+            <input type="text" required value={nombre} onChange={(e) => setNombre(e.target.value)} className={inputCls} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Moneda</label>
+              <input type="text" required value={moneda} onChange={(e) => setMoneda(e.target.value.toUpperCase())} className={inputCls} maxLength={6} />
+            </div>
+            <div>
+              <label className={labelCls}>Saldo inicial</label>
+              <input type="text" inputMode="decimal" value={saldoInicial} onChange={(e) => setSaldoInicial(e.target.value)} className={inputCls} placeholder="0" />
+            </div>
+          </div>
+          <p className="text-gray-500 text-xs">El saldo actual se recalcula solo: saldo inicial + resultados de sesiones + movimientos.</p>
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg transition-colors">Cancelar</button>
+            <button type="submit" disabled={loading} className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white py-2 rounded-lg transition-colors">
+              {loading ? 'Guardando…' : 'Guardar cambios'}
             </button>
           </div>
         </form>
@@ -210,6 +282,7 @@ export default function TrackerBankrollPage() {
   const [deletingTxId, setDeletingTxId] = useState(null)
 
   const [showNewBankroll, setShowNewBankroll] = useState(false)
+  const [showEditBankroll, setShowEditBankroll] = useState(false)
   const [showNewTx, setShowNewTx] = useState(false)
 
   const showToast = (msg) => {
@@ -257,6 +330,11 @@ export default function TrackerBankrollPage() {
     setBankrolls((prev) => [...prev, saved])
     setSelectedId(saved.id)
     setShowNewBankroll(false)
+  }
+
+  const handleBankrollEdited = (saved) => {
+    setBankrolls((prev) => prev.map((b) => (b.id === saved.id ? saved : b)))
+    setShowEditBankroll(false)
   }
 
   const handleTxSaved = (saved) => {
@@ -338,6 +416,7 @@ export default function TrackerBankrollPage() {
                 <h2 className="text-white font-semibold">{selected.nombre}</h2>
                 <div className="flex items-center gap-3">
                   <button onClick={() => setShowNewTx(true)} className="text-emerald-400 text-sm hover:underline">+ Movimiento</button>
+                  <button onClick={() => setShowEditBankroll(true)} className="text-gray-400 text-xs hover:text-white transition-colors">Editar</button>
                   <button onClick={() => handleDeleteBankroll(selected.id)} className={`text-xs transition-colors ${deletingId === selected.id ? 'text-red-400 font-semibold' : 'text-gray-400 hover:text-red-400'}`}>
                     {deletingId === selected.id ? '¿Confirmar borrado?' : 'Borrar cuenta'}
                   </button>
@@ -387,6 +466,7 @@ export default function TrackerBankrollPage() {
       )}
 
       {showNewBankroll && <NewBankrollModal onClose={() => setShowNewBankroll(false)} onSaved={handleBankrollSaved} />}
+      {showEditBankroll && selected && <EditBankrollModal bankroll={selected} onClose={() => setShowEditBankroll(false)} onSaved={handleBankrollEdited} />}
       {showNewTx && selected && <NewTransactionModal bankroll={selected} onClose={() => setShowNewTx(false)} onSaved={handleTxSaved} />}
       <Toast msg={toastMsg} />
     </div>

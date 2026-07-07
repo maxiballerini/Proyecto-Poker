@@ -4,7 +4,7 @@ import { api } from '../lib/api'
 import AmountDisplay from '../components/AmountDisplay'
 import Toast from '../components/tracker/Toast'
 import SessionFormModal from '../components/tracker/SessionFormModal'
-import GoalsCard from '../components/tracker/GoalsCard'
+import ResultsCalendar from '../components/tracker/ResultsCalendar'
 
 function NavCard({ to, title, desc }) {
   return (
@@ -34,6 +34,12 @@ export default function TrackerPage() {
   const [toastMsg, setToastMsg] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [activeBankrollId, setActiveBankrollId] = useState(() => localStorage.getItem('tracker_active_bankroll') ?? '')
+
+  const selectBankroll = (id) => {
+    setActiveBankrollId(id)
+    localStorage.setItem('tracker_active_bankroll', id)
+  }
 
   const showToast = (msg) => {
     setToastMsg(msg)
@@ -49,6 +55,12 @@ export default function TrackerPage() {
       ])
       setSessions(sessionsData)
       setBankrolls(bankrollsData)
+      const stored = localStorage.getItem('tracker_active_bankroll')
+      if (stored === null && bankrollsData.length > 0) {
+        selectBankroll(bankrollsData[0].id)
+      } else if (stored && !bankrollsData.some((b) => b.id === stored)) {
+        selectBankroll('')
+      }
       setError(null)
     } catch (err) {
       setError(err.message)
@@ -78,13 +90,24 @@ export default function TrackerPage() {
     }
   }
 
-  const totalNeto = sessions.reduce((acc, s) => acc + s.resultado_neto_centavos, 0)
-  const ganadoras = sessions.filter((s) => s.resultado_neto_centavos > 0).length
-  const winRate = sessions.length ? Math.round((ganadoras / sessions.length) * 100) : 0
-  const totalHoras = sessions.reduce((acc, s) => acc + (s.duracion_min || 0), 0) / 60
-  const torneos = sessions.filter((s) => s.tipo === 'torneo')
+  const activeBankroll = bankrolls.find((b) => b.id === activeBankrollId) ?? null
+  const visibleSessions = activeBankrollId ? sessions.filter((s) => s.bankroll_id === activeBankrollId) : sessions
+
+  const totalNeto = visibleSessions.reduce((acc, s) => acc + s.resultado_neto_centavos, 0)
+  const ganadoras = visibleSessions.filter((s) => s.resultado_neto_centavos > 0).length
+  // Cada recompra cuenta como una entrada más al calcular el % de ganadoras
+  const totalEntradas = visibleSessions.reduce((acc, s) => acc + 1 + (s.torneo?.rebuys || 0), 0)
+  const winRate = totalEntradas ? Math.round((ganadoras / totalEntradas) * 100) : 0
+  const saldoBankroll = activeBankroll
+    ? activeBankroll.saldo_actual_centavos
+    : bankrolls.reduce((acc, b) => acc + b.saldo_actual_centavos, 0)
+  const torneos = visibleSessions.filter((s) => s.tipo === 'torneo')
   const cashes = torneos.filter((s) => s.torneo?.posicion_final && s.torneo?.entrantes_totales && s.torneo.posicion_final <= Math.ceil(s.torneo.entrantes_totales * 0.15))
   const itm = torneos.length ? Math.round((cashes.length / torneos.length) * 100) : null
+  // ABI: total invertido en torneos / cantidad de entradas (recompras incluidas)
+  const entradasTorneo = torneos.reduce((acc, s) => acc + 1 + (s.torneo?.rebuys || 0), 0)
+  const costoTorneos = torneos.reduce((acc, s) => acc + (s.torneo?.costo_total_centavos || 0), 0)
+  const abi = entradasTorneo ? Math.round(costoTorneos / entradasTorneo) : 0
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -100,20 +123,47 @@ export default function TrackerPage() {
 
       {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
-      {!loading && sessions.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <StatBox label="Resultado total" value={<AmountDisplay centavos={totalNeto} />} positive={totalNeto >= 0} />
-          <StatBox label="Sesiones" value={sessions.length} />
-          <StatBox label="% sesiones ganadoras" value={`${winRate}%`} />
-          <StatBox label="Horas jugadas" value={totalHoras.toFixed(1)} />
+      {bankrolls.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          <button
+            onClick={() => selectBankroll('')}
+            className={`px-3 py-1.5 rounded-full text-sm transition-colors ${activeBankrollId === '' ? 'bg-emerald-600 text-white font-medium' : 'bg-gray-800 text-gray-400 hover:text-white'}`}
+          >
+            Todos
+          </button>
+          {bankrolls.map((b) => (
+            <button
+              key={b.id}
+              onClick={() => selectBankroll(b.id)}
+              className={`px-3 py-1.5 rounded-full text-sm transition-colors ${activeBankrollId === b.id ? 'bg-emerald-600 text-white font-medium' : 'bg-gray-800 text-gray-400 hover:text-white'}`}
+            >
+              {b.nombre}
+            </button>
+          ))}
         </div>
       )}
 
-      <GoalsCard />
+      {!loading && visibleSessions.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+          <StatBox label="Resultado total" value={<AmountDisplay centavos={totalNeto} />} positive={totalNeto >= 0} />
+          <StatBox label="Buy ins" value={totalEntradas} />
+          <StatBox label="% ITM" value={`${winRate}%`} />
+          <StatBox label="ABI" value={<AmountDisplay centavos={abi} />} />
+          <StatBox label={activeBankroll ? `Bankroll ${activeBankroll.nombre}` : 'Bankroll total'} value={<AmountDisplay centavos={saldoBankroll} />} positive={saldoBankroll >= 0} />
+        </div>
+      )}
+
+      {!loading && <ResultsCalendar sessions={visibleSessions} />}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <NavCard to="/tracker/sessions" title="Sesiones" desc="Historial completo con filtros por tipo y modalidad" />
-        <NavCard to="/tracker/bankroll" title="Bankroll" desc={bankrolls.length ? `${bankrolls.length} cuenta${bankrolls.length > 1 ? 's' : ''} · gestioná tus saldos` : 'Creá tu primera cuenta de bankroll'} />
+        <NavCard
+          to="/tracker/bankroll"
+          title={activeBankroll ? `Bankroll: ${activeBankroll.nombre}` : 'Bankroll'}
+          desc={activeBankroll
+            ? <>Saldo: <AmountDisplay centavos={activeBankroll.saldo_actual_centavos} className={`font-semibold ${activeBankroll.saldo_actual_centavos >= 0 ? 'text-emerald-400' : 'text-red-400'}`} /> {activeBankroll.moneda}</>
+            : bankrolls.length ? `${bankrolls.length} cuenta${bankrolls.length > 1 ? 's' : ''} · gestioná tus saldos` : 'Creá tu primera cuenta de bankroll'}
+        />
         <NavCard to="/tracker/stats" title="Estadísticas" desc={itm != null ? `ITM ${itm}% · ROI, rachas, breakdown por bounty y más` : 'ITM%, ROI, rachas, breakdown por bounty y más'} />
       </div>
 
@@ -124,14 +174,14 @@ export default function TrackerPage() {
         </div>
         {loading ? (
           <p className="text-gray-400 text-sm">Cargando…</p>
-        ) : sessions.length === 0 ? (
+        ) : visibleSessions.length === 0 ? (
           <div className="text-center py-10">
-            <p className="text-gray-400">Todavía no cargaste ninguna sesión.</p>
+            <p className="text-gray-400">{activeBankrollId ? 'No hay sesiones en este bankroll.' : 'Todavía no cargaste ninguna sesión.'}</p>
             <button onClick={() => setShowModal(true)} className="mt-3 text-emerald-400 text-sm hover:underline">Cargar tu primera sesión</button>
           </div>
         ) : (
           <div className="space-y-2">
-            {sessions.slice(0, 5).map((s) => (
+            {visibleSessions.slice(0, 5).map((s) => (
               <div key={s.id} className="flex items-center justify-between py-2 border-b border-gray-700 last:border-0">
                 <div className="min-w-0">
                   <p className="text-white text-sm truncate">
@@ -157,6 +207,7 @@ export default function TrackerPage() {
       {showModal && (
         <SessionFormModal
           bankrolls={bankrolls}
+          defaultBankrollId={activeBankrollId}
           initial={null}
           onClose={() => setShowModal(false)}
           onSaved={handleSaved}

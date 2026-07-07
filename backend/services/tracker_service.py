@@ -81,6 +81,7 @@ def build_tournament_entry_row(session_id: str, body: PokerSessionCreate) -> dic
         'premio_pozo_centavos': t.premio_pozo_centavos,
         'entrantes_totales': t.entrantes_totales,
         'posicion_final': t.posicion_final,
+        'puestos_pagos': t.puestos_pagos,
         'estructura': t.estructura,
         'late_reg': t.late_reg,
     }

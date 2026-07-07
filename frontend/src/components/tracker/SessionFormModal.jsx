@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../lib/api'
 
 const inputCls = 'w-full bg-gray-700 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500'
@@ -6,25 +6,31 @@ const labelCls = 'block text-gray-300 text-xs mb-1'
 
 const toCentavos = (s) => {
   if (s === '' || s == null) return 0
-  const n = parseFloat(String(s).replace(',', '.'))
+  let str = String(s).trim().replace(/\s/g, '')
+  const lastComma = str.lastIndexOf(',')
+  const lastDot = str.lastIndexOf('.')
+  if (lastComma !== -1 && lastDot !== -1) {
+    // el separador que aparece último es el decimal
+    if (lastComma > lastDot) str = str.replace(/\./g, '').replace(',', '.')
+    else str = str.replace(/,/g, '')
+  } else if (lastComma !== -1) {
+    str = str.replace(',', '.')
+  } else if (lastDot !== -1) {
+    // punto con exactamente 3 dígitos detrás = separador de miles (10.000)
+    const parts = str.split('.')
+    if (parts.length > 2 || parts[parts.length - 1].length === 3) str = str.replace(/\./g, '')
+  }
+  const n = parseFloat(str)
   return isNaN(n) ? 0 : Math.round(n * 100)
 }
 const fromCentavos = (c) => (c == null ? '' : String(c / 100))
 const toIntOrNull = (s) => (s === '' || s == null ? null : parseInt(s, 10))
 
-const VARIANTES = ['NLHE', 'PLO', 'PLO5', 'Mixto', 'Otro']
-const ESTRUCTURAS = [
-  { value: 'regular', label: 'Regular' },
-  { value: 'turbo', label: 'Turbo' },
-  { value: 'hyper', label: 'Hyper' },
-  { value: 'deepstack', label: 'Deepstack' },
-]
-
 function Field({ label, children }) {
   return (
-    <div>
+    <div className="flex flex-col">
       <label className={labelCls}>{label}</label>
-      {children}
+      <div className="mt-auto">{children}</div>
     </div>
   )
 }
@@ -103,6 +109,7 @@ function emptyTorneo(t = null) {
     addons: t?.addons ?? 0,
     premioPozo: fromCentavos(t?.premio_pozo_centavos),
     entrantes: t?.entrantes_totales != null ? String(t.entrantes_totales) : '',
+    puestosPagos: t?.puestos_pagos != null ? String(t.puestos_pagos) : '',
     posicion: t?.posicion_final != null ? String(t.posicion_final) : '',
     estructura: t?.estructura ?? 'regular',
     lateReg: t?.late_reg ?? false,
@@ -115,7 +122,7 @@ function emptyTorneo(t = null) {
 
 function buildTorneoPayload(t) {
   return {
-    nombre_torneo: t.nombreTorneo || null,
+    nombre_torneo: t.nombreTorneo || (t.esBounty ? 'Torneo bounty' : 'Torneo'),
     buyin_centavos: toCentavos(t.buyinTorneo),
     comision_centavos: toCentavos(t.comision),
     rebuys: parseInt(t.rebuys, 10) || 0,
@@ -126,6 +133,7 @@ function buildTorneoPayload(t) {
     ganancia_bounty_centavos: t.esBounty ? toCentavos(t.gananciaBounty) : 0,
     premio_pozo_centavos: toCentavos(t.premioPozo),
     entrantes_totales: toIntOrNull(t.entrantes),
+    puestos_pagos: toIntOrNull(t.puestosPagos),
     posicion_final: toIntOrNull(t.posicion),
     estructura: t.estructura,
     late_reg: t.lateReg,
@@ -162,8 +170,8 @@ function TorneoBlock({ torneo, onChange, onRemove, canRemove, index }) {
         <Field label="Buy-in total">
           <input type="text" inputMode="decimal" value={torneo.buyinTorneo} onChange={set('buyinTorneo')} className={inputCls} placeholder="25" />
         </Field>
-        <Field label="Comisión">
-          <input type="text" inputMode="decimal" value={torneo.comision} onChange={set('comision')} className={inputCls} placeholder="0" />
+        <Field label="Cashout">
+          <input type="text" inputMode="decimal" value={torneo.premioPozo} onChange={set('premioPozo')} className={inputCls} placeholder="0" />
         </Field>
         <Field label="Re-entries">
           <input type="number" min="0" value={torneo.rebuys} onChange={set('rebuys')} className={inputCls} />
@@ -171,26 +179,16 @@ function TorneoBlock({ torneo, onChange, onRemove, canRemove, index }) {
         <Field label="Add-ons">
           <input type="number" min="0" value={torneo.addons} onChange={set('addons')} className={inputCls} />
         </Field>
-        <Field label="Entrantes totales">
+        <Field label="Entrantes">
           <input type="number" min="1" value={torneo.entrantes} onChange={set('entrantes')} className={inputCls} placeholder="450" />
         </Field>
         <Field label="Posición final">
           <input type="number" min="1" value={torneo.posicion} onChange={set('posicion')} className={inputCls} placeholder="12" />
         </Field>
-        <Field label="Estructura">
-          <select value={torneo.estructura} onChange={set('estructura')} className={inputCls}>
-            {ESTRUCTURAS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </Field>
-        <Field label="Premio del pozo">
-          <input type="text" inputMode="decimal" value={torneo.premioPozo} onChange={set('premioPozo')} className={inputCls} placeholder="0" />
+        <Field label="Puestos pagos">
+          <input type="number" min="1" value={torneo.puestosPagos} onChange={set('puestosPagos')} className={inputCls} placeholder="63" />
         </Field>
       </div>
-
-      <label className="flex items-center gap-2 text-sm text-gray-300">
-        <input type="checkbox" checked={torneo.lateReg} onChange={set('lateReg')} className="rounded border-gray-600 bg-gray-700 text-emerald-500 focus:ring-emerald-500" />
-        Entré por late registration
-      </label>
 
       <label className="flex items-center gap-2 text-sm text-gray-300 pt-1 border-t border-gray-700">
         <input type="checkbox" checked={torneo.esBounty} onChange={set('esBounty')} className="rounded border-gray-600 bg-gray-700 text-emerald-500 focus:ring-emerald-500" />
@@ -224,10 +222,10 @@ function TorneoBlock({ torneo, onChange, onRemove, canRemove, index }) {
 // Main modal
 // ---------------------------------------------------------------------------
 
-export default function SessionFormModal({ onClose, onSaved, bankrolls, initial }) {
+export default function SessionFormModal({ onClose, onSaved, bankrolls, initial, defaultBankrollId }) {
   const [tipo, setTipo] = useState(initial?.tipo ?? 'torneo')
   const [modalidad, setModalidad] = useState(initial?.modalidad ?? 'online')
-  const [bankrollId, setBankrollId] = useState(initial?.bankroll_id ?? '')
+  const [bankrollId, setBankrollId] = useState(initial?.bankroll_id ?? defaultBankrollId ?? '')
   const [variante, setVariante] = useState(initial?.variante ?? '')
   const [fecha, setFecha] = useState(initial?.fecha ?? new Date().toISOString().slice(0, 10))
   const [ubicacion, setUbicacion] = useState(initial ? (initial.ubicacion ?? '') : 'GGpoker')
@@ -251,6 +249,12 @@ export default function SessionFormModal({ onClose, onSaved, bankrolls, initial 
 
   const fileInputRef = useRef(null)
   const folderInputRef = useRef(null)
+
+  useEffect(() => {
+    const onKeyDown = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
 
   const updateTorneo = (index, field, value) =>
     setTorneos((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)))
@@ -389,30 +393,14 @@ export default function SessionFormModal({ onClose, onSaved, bankrolls, initial 
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Field label="Fecha">
               <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} required className={inputCls} />
             </Field>
-            <Field label="Variante">
-              <select value={variante} onChange={(e) => setVariante(e.target.value)} className={inputCls}>
-                <option value="">—</option>
-                {VARIANTES.map((v) => <option key={v} value={v}>{v}</option>)}
-              </select>
-            </Field>
-            <Field label="Duración total (min)">
-              <input type="number" min="0" value={duracionMin} onChange={(e) => setDuracionMin(e.target.value)} className={inputCls} placeholder="120" />
-            </Field>
-            <Field label="Bankroll">
-              <select value={bankrollId} onChange={(e) => setBankrollId(e.target.value)} className={inputCls}>
-                <option value="">Sin asignar</option>
-                {bankrolls.map((b) => <option key={b.id} value={b.id}>{b.nombre}</option>)}
-              </select>
+            <Field label="Ubicación / sitio">
+              <input type="text" value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} className={inputCls} placeholder="PokerStars, Casino X…" />
             </Field>
           </div>
-
-          <Field label="Ubicación / sitio">
-            <input type="text" value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} className={inputCls} placeholder="PokerStars, Casino X…" />
-          </Field>
 
           {tipo === 'cash' ? (
             <div className="bg-gray-900/50 rounded-lg p-4 space-y-3">
@@ -455,22 +443,6 @@ export default function SessionFormModal({ onClose, onSaved, bankrolls, initial 
               )}
             </>
           )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="Notas">
-              <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={2} className={inputCls} placeholder="Cómo jugaste, leaks, lecturas…" />
-            </Field>
-            <Field label="Estado de ánimo (opcional)">
-              <div className="flex gap-1">
-                {[1, 2, 3, 4, 5].map((m) => (
-                  <button key={m} type="button" onClick={() => setMood(mood === m ? null : m)}
-                    className={`flex-1 py-2 rounded-lg text-sm transition-colors ${mood === m ? 'bg-emerald-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}>
-                    {m}
-                  </button>
-                ))}
-              </div>
-            </Field>
-          </div>
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <div className="flex gap-3 pt-1">

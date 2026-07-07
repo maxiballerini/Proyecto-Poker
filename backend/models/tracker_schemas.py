@@ -29,6 +29,7 @@ class BankrollCreate(BaseModel):
 class BankrollUpdate(BaseModel):
     nombre: Optional[str] = None
     moneda: Optional[str] = None
+    saldo_inicial_centavos: Optional[int] = None
 
 
 class BankrollResponse(BaseModel):
@@ -128,6 +129,7 @@ class TournamentEntryData(BaseModel):
     premio_pozo_centavos: int = 0
     entrantes_totales: Optional[int] = None
     posicion_final: Optional[int] = None
+    puestos_pagos: Optional[int] = None
     estructura: Optional[Estructura] = None
     late_reg: bool = False
 
@@ -141,7 +143,7 @@ class TournamentEntryData(BaseModel):
             raise ValueError('no puede ser negativo')
         return v
 
-    @field_validator('entrantes_totales', 'posicion_final')
+    @field_validator('entrantes_totales', 'posicion_final', 'puestos_pagos')
     @classmethod
     def positivo_si_presente(cls, v):
         if v is not None and v <= 0:
@@ -166,6 +168,7 @@ class TournamentEntryResponse(BaseModel):
     premio_pozo_centavos: int
     entrantes_totales: Optional[int] = None
     posicion_final: Optional[int] = None
+    puestos_pagos: Optional[int] = None
     estructura: Optional[str] = None
     late_reg: bool
 
