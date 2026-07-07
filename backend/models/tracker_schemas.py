@@ -174,7 +174,7 @@ class PokerSessionCreate(BaseModel):
     bankroll_id: Optional[str] = None
     tipo: SessionTipo
     modalidad: Modalidad
-    variante: str = 'NLHE'
+    variante: Optional[str] = None
     fecha: Optional[date] = None
     ubicacion: Optional[str] = None
     duracion_min: Optional[int] = None
@@ -223,7 +223,7 @@ class PokerSessionResponse(BaseModel):
     bankroll_id: Optional[str] = None
     tipo: str
     modalidad: str
-    variante: str
+    variante: Optional[str] = None
     fecha: date
     ubicacion: Optional[str] = None
     duracion_min: Optional[int] = None

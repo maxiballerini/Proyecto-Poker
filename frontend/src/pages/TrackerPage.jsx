@@ -33,6 +33,7 @@ export default function TrackerPage() {
   const [error, setError] = useState(null)
   const [toastMsg, setToastMsg] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
 
   const showToast = (msg) => {
     setToastMsg(msg)
@@ -62,6 +63,19 @@ export default function TrackerPage() {
     const list = Array.isArray(saved) ? saved : [saved]
     setSessions((prev) => [...list, ...prev])
     setShowModal(false)
+  }
+
+  const handleDelete = async (id) => {
+    if (deletingId !== id) { setDeletingId(id); return }
+    const snap = sessions
+    setSessions((prev) => prev.filter((s) => s.id !== id))
+    setDeletingId(null)
+    try {
+      await api.delete(`/tracker/sessions/${id}`)
+    } catch (err) {
+      setSessions(snap)
+      showToast(err.message)
+    }
   }
 
   const totalNeto = sessions.reduce((acc, s) => acc + s.resultado_neto_centavos, 0)
@@ -125,7 +139,15 @@ export default function TrackerPage() {
                     <span className="text-gray-500"> · {s.fecha}</span>
                   </p>
                 </div>
-                <AmountDisplay centavos={s.resultado_neto_centavos} className={`font-semibold text-sm shrink-0 ml-3 ${s.resultado_neto_centavos >= 0 ? 'text-emerald-400' : 'text-red-400'}`} />
+                <div className="flex items-center gap-3 shrink-0 ml-3">
+                  <AmountDisplay centavos={s.resultado_neto_centavos} className={`font-semibold text-sm ${s.resultado_neto_centavos >= 0 ? 'text-emerald-400' : 'text-red-400'}`} />
+                  <button
+                    onClick={() => handleDelete(s.id)}
+                    className={`text-xs transition-colors ${deletingId === s.id ? 'text-red-400 font-semibold' : 'text-gray-500 hover:text-red-400'}`}
+                  >
+                    {deletingId === s.id ? '¿Confirmar?' : 'Borrar'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>

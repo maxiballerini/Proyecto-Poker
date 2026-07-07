@@ -225,12 +225,12 @@ function TorneoBlock({ torneo, onChange, onRemove, canRemove, index }) {
 // ---------------------------------------------------------------------------
 
 export default function SessionFormModal({ onClose, onSaved, bankrolls, initial }) {
-  const [tipo, setTipo] = useState(initial?.tipo ?? 'cash')
-  const [modalidad, setModalidad] = useState(initial?.modalidad ?? 'vivo')
+  const [tipo, setTipo] = useState(initial?.tipo ?? 'torneo')
+  const [modalidad, setModalidad] = useState(initial?.modalidad ?? 'online')
   const [bankrollId, setBankrollId] = useState(initial?.bankroll_id ?? '')
-  const [variante, setVariante] = useState(initial?.variante ?? 'NLHE')
+  const [variante, setVariante] = useState(initial?.variante ?? '')
   const [fecha, setFecha] = useState(initial?.fecha ?? new Date().toISOString().slice(0, 10))
-  const [ubicacion, setUbicacion] = useState(initial?.ubicacion ?? '')
+  const [ubicacion, setUbicacion] = useState(initial ? (initial.ubicacion ?? '') : 'GGpoker')
   const [duracionMin, setDuracionMin] = useState(initial?.duracion_min != null ? String(initial.duracion_min) : '')
   const [notas, setNotas] = useState(initial?.notas ?? '')
   const [mood, setMood] = useState(initial?.mood ?? null)
@@ -295,7 +295,7 @@ export default function SessionFormModal({ onClose, onSaved, bankrolls, initial 
       bankroll_id: bankrollId || null,
       tipo,
       modalidad,
-      variante,
+      variante: variante || null,
       fecha,
       ubicacion: ubicacion || null,
       duracion_min: toIntOrNull(duracionMin),
@@ -395,6 +395,7 @@ export default function SessionFormModal({ onClose, onSaved, bankrolls, initial 
             </Field>
             <Field label="Variante">
               <select value={variante} onChange={(e) => setVariante(e.target.value)} className={inputCls}>
+                <option value="">—</option>
                 {VARIANTES.map((v) => <option key={v} value={v}>{v}</option>)}
               </select>
             </Field>
