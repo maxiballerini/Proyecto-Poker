@@ -44,6 +44,7 @@ function parsePokerCraftFile(text) {
   if (!lines.length) return null
 
   // Line 0: "Tournament #ID, Code: Name, Hold'em No Limit"
+  const tidMatch = lines[0].match(/Tournament #(\d+)/)
   const nameMatch = lines[0].match(/Tournament #\d+,\s*[^:]*:\s*(.+?),\s*Hold'em No Limit/i)
   const nombreTorneo = nameMatch ? nameMatch[1].trim() : ''
 
@@ -57,7 +58,7 @@ function parsePokerCraftFile(text) {
 
   // "18953 Players"
   const playersMatch = lines.find((l) => /Players/.test(l))?.match(/^([\d,]+)\s+Players/)
-  const entrantes = playersMatch ? parseInt(playersMatch[1].replace(',', ''), 10) : null
+  const entrantes = playersMatch ? parseInt(playersMatch[1].replace(/,/g, ''), 10) : null
 
   // "Tournament started 2026/06/06 14:30:00"
   const dateMatch = lines.find((l) => l.startsWith('Tournament started'))?.match(/(\d{4})\/(\d{2})\/(\d{2})/)
@@ -74,7 +75,7 @@ function parsePokerCraftFile(text) {
 
   // Prize: "$0" or "$1,234.56" — chips-based tournaments have no $ amount
   const prizeMatch = receivedLine?.match(/received a total of \$([0-9.,]+)/)
-  const premioPozo = prizeMatch ? Math.round(parseFloat(prizeMatch[1].replace(',', '')) * 100) : 0
+  const premioPozo = prizeMatch ? Math.round(parseFloat(prizeMatch[1].replace(/,/g, '')) * 100) : 0
 
   return {
     nombreTorneo,
@@ -92,6 +93,7 @@ function parsePokerCraftFile(text) {
     bountiesCobrados: 0,
     gananciaBounty: '',
     _fecha: fecha,
+    _tid: tidMatch ? tidMatch[1] : null,
   }
 }
 
@@ -102,6 +104,8 @@ function parsePokerCraftFile(text) {
 function emptyTorneo(t = null) {
   return {
     _key: Date.now() + Math.random(),
+    _tid: null,
+    fecha: null, // fecha propia (importada); si es null usa la fecha general del form
     nombreTorneo: t?.nombre_torneo ?? '',
     buyinTorneo: fromCentavos(t?.buyin_centavos),
     comision: fromCentavos(t?.comision_centavos),
@@ -167,6 +171,11 @@ function TorneoBlock({ torneo, onChange, onRemove, canRemove, index }) {
       </Field>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {torneo.fecha != null && (
+          <Field label="Fecha">
+            <input type="date" value={torneo.fecha} onChange={set('fecha')} className={inputCls} />
+          </Field>
+        )}
         <Field label="Buy-in total">
           <input type="text" inputMode="decimal" value={torneo.buyinTorneo} onChange={set('buyinTorneo')} className={inputCls} placeholder="25" />
         </Field>
@@ -222,7 +231,7 @@ function TorneoBlock({ torneo, onChange, onRemove, canRemove, index }) {
 // Main modal
 // ---------------------------------------------------------------------------
 
-export default function SessionFormModal({ onClose, onSaved, bankrolls, initial, defaultBankrollId }) {
+export default function SessionFormModal({ onClose, onSaved, bankrolls, initial, defaultBankrollId, existingSessions = [] }) {
   const [tipo, setTipo] = useState(initial?.tipo ?? 'torneo')
   const [modalidad, setModalidad] = useState(initial?.modalidad ?? 'online')
   const [bankrollId, setBankrollId] = useState(initial?.bankroll_id ?? defaultBankrollId ?? '')
@@ -276,15 +285,31 @@ export default function SessionFormModal({ onClose, onSaved, bankrolls, initial,
       const valid = parsed.filter(Boolean)
       if (!valid.length) { setImportError('No se pudo leer ningún archivo.'); return }
 
-      if (valid[0]._fecha) setFecha(valid[0]._fecha)
-      setModalidad('online')
-      setTipo('torneo')
+      const onlyEmpty = torneos.length === 1 && !torneos[0].nombreTorneo && !torneos[0].buyinTorneo
+      const base = onlyEmpty ? [] : torneos
+      const tidsEnForm = new Set(base.map((t) => t._tid).filter(Boolean))
+      const nuevos = []
+      let omitidos = 0
 
-      setTorneos((prev) => {
-        const onlyEmpty = prev.length === 1 && !prev[0].nombreTorneo && !prev[0].buyinTorneo
-        const newBlocks = valid.map(({ _fecha, ...t }) => ({ ...emptyTorneo(), ...t, _key: Date.now() + Math.random() }))
-        return onlyEmpty ? newBlocks : [...prev, ...newBlocks]
-      })
+      for (const { _fecha, _tid, ...t } of valid) {
+        const yaEnForm = _tid && tidsEnForm.has(_tid)
+        const yaGuardado = existingSessions.some((s) =>
+          s.fecha === _fecha &&
+          s.torneo?.nombre_torneo === t.nombreTorneo &&
+          String(s.torneo?.posicion_final ?? '') === t.posicion
+        )
+        if (yaEnForm || yaGuardado) { omitidos++; continue }
+        if (_tid) tidsEnForm.add(_tid)
+        nuevos.push({ ...emptyTorneo(), ...t, fecha: _fecha, _tid, _key: Date.now() + Math.random() })
+      }
+
+      if (nuevos.length) {
+        if (nuevos[0].fecha) setFecha(nuevos[0].fecha)
+        setModalidad('online')
+        setTipo('torneo')
+        setTorneos([...base, ...nuevos])
+      }
+      setImportError(omitidos ? `${omitidos} torneo${omitidos > 1 ? 's' : ''} ya cargado${omitidos > 1 ? 's' : ''} — se omitieron para no duplicar.` : null)
 
       e.target.value = ''
     })
@@ -327,7 +352,7 @@ export default function SessionFormModal({ onClose, onSaved, bankrolls, initial,
         onSaved(saved)
       } else {
         const results = await Promise.all(
-          torneos.map((t) => api.post('/tracker/sessions', { ...shared, torneo: buildTorneoPayload(t) }))
+          torneos.map((t) => api.post('/tracker/sessions', { ...shared, fecha: t.fecha || fecha, torneo: buildTorneoPayload(t) }))
         )
         onSaved(results.length === 1 ? results[0] : results)
       }

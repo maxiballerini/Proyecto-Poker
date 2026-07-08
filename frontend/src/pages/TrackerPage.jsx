@@ -208,6 +208,7 @@ export default function TrackerPage() {
         <SessionFormModal
           bankrolls={bankrolls}
           defaultBankrollId={activeBankrollId}
+          existingSessions={sessions}
           initial={null}
           onClose={() => setShowModal(false)}
           onSaved={handleSaved}

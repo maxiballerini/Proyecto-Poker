@@ -219,6 +219,7 @@ export default function TrackerSessionsPage() {
         <SessionFormModal
           bankrolls={bankrolls}
           initial={editing}
+          existingSessions={sessions}
           onClose={() => { setShowModal(false); setEditing(null) }}
           onSaved={handleSaved}
         />
