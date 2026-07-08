@@ -26,6 +26,12 @@ const toCentavos = (s) => {
 const fromCentavos = (c) => (c == null ? '' : String(c / 100))
 const toIntOrNull = (s) => (s === '' || s == null ? null : parseInt(s, 10))
 
+// Fecha de hoy en hora LOCAL — toISOString() usa UTC y de noche ya devuelve el día siguiente
+const hoyLocal = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 function Field({ label, children }) {
   return (
     <div className="flex flex-col">
@@ -43,10 +49,15 @@ function parsePokerCraftFile(text) {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
   if (!lines.length) return null
 
-  // Line 0: "Tournament #ID, Code: Name, Hold'em No Limit"
+  // Line 0: "Tournament #ID, Name, Hold'em No Limit" — a veces con código: "Tournament #ID, 336-L: Name, ..."
   const tidMatch = lines[0].match(/Tournament #(\d+)/)
-  const nameMatch = lines[0].match(/Tournament #\d+,\s*[^:]*:\s*(.+?),\s*Hold'em No Limit/i)
-  const nombreTorneo = nameMatch ? nameMatch[1].trim() : ''
+  const nameMatch = lines[0].match(/Tournament #\d+,\s*(.+)/i)
+  const nombreTorneo = nameMatch
+    ? nameMatch[1]
+        .replace(/,\s*[^,]*(Hold'em|Holdem|Omaha|Short Deck)[^,]*\s*$/i, '') // saca ", Hold'em No Limit" final
+        .replace(/^[A-Za-z0-9-]+:\s*/, '') // saca el código tipo "336-L:"
+        .trim()
+    : ''
 
   const isBounty = /bounty|mystery bounty|secret ko|progressive ko|\bpko\b|\bko\b/i.test(nombreTorneo)
   const estructura = /hyper/i.test(nombreTorneo) ? 'hyper' : /turbo/i.test(nombreTorneo) ? 'turbo' : 'regular'
@@ -236,7 +247,7 @@ export default function SessionFormModal({ onClose, onSaved, bankrolls, initial,
   const [modalidad, setModalidad] = useState(initial?.modalidad ?? 'online')
   const [bankrollId, setBankrollId] = useState(initial?.bankroll_id ?? defaultBankrollId ?? '')
   const [variante, setVariante] = useState(initial?.variante ?? '')
-  const [fecha, setFecha] = useState(initial?.fecha ?? new Date().toISOString().slice(0, 10))
+  const [fecha, setFecha] = useState(initial?.fecha ?? hoyLocal())
   const [ubicacion, setUbicacion] = useState(initial ? (initial.ubicacion ?? '') : 'GGpoker')
   const [duracionMin, setDuracionMin] = useState(initial?.duracion_min != null ? String(initial.duracion_min) : '')
   const [notas, setNotas] = useState(initial?.notas ?? '')
